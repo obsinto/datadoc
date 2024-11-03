@@ -16,9 +16,11 @@ class DocumentController extends Controller
         try {
             // Validação
             $validateData = $request->validate([
-                'excel_file' => 'required'
+                'excel_file' => 'required|file|mimes:xls,xls',
             ], [
                 'excel_file.required' => 'O arquivo é obrigatório!',
+                'excel_file.file' => 'Por favor, envie um arquivo válido.',
+                'excel_file.mimes' => 'O arquivo deve ser do tipo xls ou xlsx!',
             ]);
 
             // Obtem o arquivo
@@ -31,15 +33,14 @@ class DocumentController extends Controller
                     ->withInput();
             }
 
-            // Caminho temporário do arquivo
+
             $filePath = $file->getRealPath();
 
-            // Carrega a planilha Excel
+
             $spreadsheet = IOFactory::load($filePath);
             $worksheet = $spreadsheet->getActiveSheet();
-            dd($worksheet);
-            // Carrega o template Word
-            $templatePath = storage_path('app/template.docx');
+
+            $templatePath = storage_path('app/templates/termo_adesao.docx');
 
             if (!file_exists($templatePath)) {
                 return back()
@@ -49,22 +50,49 @@ class DocumentController extends Controller
 
             $templateProcessor = new TemplateProcessor($templatePath);
 
+            $cleanString = function ($value) {
+                if ($value === null || !is_string($value)) {
+                    return '';
+                }
+                return str_replace(' ', '', $value); // Remove todos os espaços
+            };
+
             // Lê dados da planilha e insere no template Word
             $data = [];
+            $header = [];
             foreach ($worksheet->getRowIterator() as $row) {
                 $cellIterator = $row->getCellIterator();
                 $cellIterator->setIterateOnlyExistingCells(false);
 
-                foreach ($cellIterator as $cell) {
-                    $data[] = $cell->getValue();
+                if ($row->getRowIndex() === 1) {
+                    foreach ($cellIterator as $cell) {
+                        $header[] = $cleanString($cell->getValue());
+                    }
+                } else {
+                    $rowData = [];
+                    foreach ($cellIterator as $cell) {
+                        $rowData[] = $cell->getValue();
+                    }
+                    $data[] = array_combine($header, $rowData);
                 }
             }
+            $count = count($data);
 
+            $templateProcessor->cloneBlock('block_block', $count, true, true);
+            foreach ($data as $index => $item) {
+                // Preenche os valores nos placeholders do bloco clonado
+                $templateProcessor->setValue('nome_do_titular#' . ($index + 1), $item['TITULAR'] ?? '');
+                $templateProcessor->setValue('cpf_do_titular#' . ($index + 1), $item['CPF'] ?? '');
+                $templateProcessor->setValue('nis_do_titular#' . ($index + 1), $item['NIS'] ?? '');
+                $templateProcessor->setValue('ci_do_titular#' . ($index + 1), $item['RG'] ?? '');
+                $templateProcessor->setValue('nome_do_conjugue#' . ($index + 1), $item['CONJUGE'] ?? '');
+                $templateProcessor->setValue('cpf_do_conjugue#' . ($index + 1), $item['CPFCONJUGE'] ?? '');
+                $templateProcessor->setValue('ci_do_conjugue#' . ($index + 1), $item['RGCONJUGE'] ?? '');
+                $templateProcessor->setValue('nis_do_conjugue#' . ($index + 1), $item['NISCONJUGE'] ?? '');
+            }
             // Exemplo de inserção de dados no template
-            $templateProcessor->setValue('campo1', $data[0] ?? '');
-            $templateProcessor->setValue('campo2', $data[1] ?? '');
 
-            // Define o caminho para salvar o documento preenchido
+            // php artisan storage:link
             $outputPath = storage_path('app/public/documento_preenchido.docx');
             $templateProcessor->saveAs($outputPath);
 
