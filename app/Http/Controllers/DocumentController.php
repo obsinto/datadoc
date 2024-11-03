@@ -42,7 +42,7 @@ class DocumentController extends Controller
             $templateChoice = $request->input('template');
             $templateMap = [
                 'termo_adesao' => 'termo_adesao.docx',
-                'contrato' => 'contrato.docx',
+                'criterios' => 'ccriterios.dot.docx',
 
             ];
 

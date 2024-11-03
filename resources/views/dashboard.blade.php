@@ -10,13 +10,13 @@
     <div class="py-12">
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-                <div class="p-6 text-gray-900 dark:text-gray-100 flex justify-center">
+                <div class="p-6 text-white  flex justify-center">
                     <form action="{{ route('import.excel') }}" method="POST" enctype="multipart/form-data">
                         @csrf
                         <label for="template">Escolha o template:</label>
-                        <select name="template" id="template">
+                        <select class="text-black py-1 text-sm rounded-lg" name="template" id="template">
                             <option value="termo_adesao">Termo de Adesão</option>
-                            <option value="contrato">Contrato</option>
+                            <option value="criterios">Criterios</option>
                             <!-- Adicione outras opções conforme necessário -->
                         </select>
                         <input type="file"
