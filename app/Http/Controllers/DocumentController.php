@@ -39,8 +39,20 @@ class DocumentController extends Controller
 
             $spreadsheet = IOFactory::load($filePath);
             $worksheet = $spreadsheet->getActiveSheet();
+            $templateChoice = $request->input('template');
+            $templateMap = [
+                'termo_adesao' => 'termo_adesao.docx',
+                'contrato' => 'contrato.docx',
 
-            $templatePath = storage_path('app/templates/termo_adesao.docx');
+            ];
+
+            if (!array_key_exists($templateChoice, $templateMap)) {
+                return back()
+                    ->withErrors(['template' => 'Template selecionado não encontrado'])
+                    ->withInput();
+            }
+
+            $templatePath = storage_path('app/templates/' . $templateMap[$templateChoice]);
 
             if (!file_exists($templatePath)) {
                 return back()
@@ -93,7 +105,7 @@ class DocumentController extends Controller
             // Exemplo de inserção de dados no template
 
             // php artisan storage:link
-            $outputPath = storage_path('app/public/documento_preenchido.docx');
+            $outputPath = storage_path('app/public/documento_preenchido_' . $templateChoice . '.docx');
             $templateProcessor->saveAs($outputPath);
 
             return response()->download($outputPath)->deleteFileAfterSend();

@@ -13,6 +13,12 @@
                 <div class="p-6 text-gray-900 dark:text-gray-100 flex justify-center">
                     <form action="{{ route('import.excel') }}" method="POST" enctype="multipart/form-data">
                         @csrf
+                        <label for="template">Escolha o template:</label>
+                        <select name="template" id="template">
+                            <option value="termo_adesao">Termo de Adesão</option>
+                            <option value="contrato">Contrato</option>
+                            <!-- Adicione outras opções conforme necessário -->
+                        </select>
                         <input type="file"
                                class="mx-auto block px-4 py-2 mb-4"
                                name="excel_file"
