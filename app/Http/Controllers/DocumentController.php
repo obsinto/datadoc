@@ -42,7 +42,7 @@ class DocumentController extends Controller
             $templateChoice = $request->input('template');
             $templateMap = [
                 'termo_adesao' => 'termo_adesao.docx',
-                'criterios' => 'ccriterios.dot.docx',
+                'criterios' => 'criterios.dot.docx',
 
             ];
 
@@ -88,20 +88,23 @@ class DocumentController extends Controller
                     $data[] = array_combine($header, $rowData);
                 }
             }
-            $count = count($data);
+            $dataChunks = array_chunk($data, 4);
+            $templateProcessor->cloneBlock('block_block', count($dataChunks), true, true);
 
-            $templateProcessor->cloneBlock('block_block', $count, true, true);
-            foreach ($data as $index => $item) {
-                // Preenche os valores nos placeholders do bloco clonado
-                $templateProcessor->setValue('nome_do_titular#' . ($index + 1), $item['TITULAR'] ?? '');
-                $templateProcessor->setValue('cpf_do_titular#' . ($index + 1), $item['CPF'] ?? '');
-                $templateProcessor->setValue('nis_do_titular#' . ($index + 1), $item['NIS'] ?? '');
-                $templateProcessor->setValue('ci_do_titular#' . ($index + 1), $item['RG'] ?? '');
-                $templateProcessor->setValue('nome_do_conjugue#' . ($index + 1), $item['CONJUGE'] ?? '');
-                $templateProcessor->setValue('cpf_do_conjugue#' . ($index + 1), $item['CPFCONJUGE'] ?? '');
-                $templateProcessor->setValue('ci_do_conjugue#' . ($index + 1), $item['RGCONJUGE'] ?? '');
-                $templateProcessor->setValue('nis_do_conjugue#' . ($index + 1), $item['NISCONJUGE'] ?? '');
+            foreach ($dataChunks as $blockIndex => $chunk) {
+                foreach ($chunk as $index => $item) {
+                    $placeholderSuffix = ($index + 1); // Define o sufixo para cada beneficiário no bloco (1 a 4)
+                    $templateProcessor->setValue('nome_do_titular' . $placeholderSuffix . '#' . ($blockIndex + 1), $item['TITULAR'] ?? '');
+                    $templateProcessor->setValue('cpf_do_titular' . $placeholderSuffix . '#' . ($blockIndex + 1), $item['CPF'] ?? '');
+                    $templateProcessor->setValue('nis_do_titular' . $placeholderSuffix . '#' . ($blockIndex + 1), $item['NIS'] ?? '');
+                    $templateProcessor->setValue('ci_do_titular' . $placeholderSuffix . '#' . ($blockIndex + 1), $item['RG'] ?? '');
+                    $templateProcessor->setValue('nome_do_conjugue' . $placeholderSuffix . '#' . ($blockIndex + 1), $item['CONJUGE'] ?? '');
+                    $templateProcessor->setValue('cpf_do_conjugue' . $placeholderSuffix . '#' . ($blockIndex + 1), $item['CPFCONJUGE'] ?? '');
+                    $templateProcessor->setValue('ci_do_conjugue' . $placeholderSuffix . '#' . ($blockIndex + 1), $item['RGCONJUGE'] ?? '');
+                    $templateProcessor->setValue('nis_do_conjugue' . $placeholderSuffix . '#' . ($blockIndex + 1), $item['NISCONJUGE'] ?? '');
+                }
             }
+
             // Exemplo de inserção de dados no template
 
             // php artisan storage:link
