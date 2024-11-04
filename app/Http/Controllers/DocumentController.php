@@ -16,12 +16,13 @@ class DocumentController extends Controller
         try {
             // Validação
             $validateData = $request->validate([
-                'excel_file' => 'required|file|mimes:xls,xls',
+                'excel_file' => 'required|file|mimes:xls,xlsx',
             ], [
                 'excel_file.required' => 'O arquivo é obrigatório!',
-                'excel_file.file' => 'Por favor, envie um arquivo válido.',
+                'excel_file' => 'required|file|mimes:xls,xlsx|max:10240', // 10MB
                 'excel_file.mimes' => 'O arquivo deve ser do tipo xls ou xlsx!',
             ]);
+
 
             // Obtem o arquivo
             $file = $request->file('excel_file');
