@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Shared\Date;
 use PhpOffice\PhpWord\TemplateProcessor;
 
 class DocumentController extends Controller
@@ -11,7 +12,6 @@ class DocumentController extends Controller
     public function store(Request $request)
     {
         try {
-            // Validação
             $validateData = $request->validate([
                 'excel_file' => 'required|file|mimes:xls,xlsx',
             ], [
@@ -19,43 +19,38 @@ class DocumentController extends Controller
                 'excel_file.mimes' => 'O arquivo deve ser do tipo xls ou xlsx!',
             ]);
 
-            // Obtem o arquivo
             $file = $request->file('excel_file');
-
-            // Verifica se o arquivo é válido
             if (!$file || !$file->isValid()) {
-                return back()
-                    ->withErrors(['excel_file' => 'Erro ao fazer o upload do arquivo Excel'])
-                    ->withInput();
+                return back()->withErrors(['excel_file' => 'Erro ao fazer o upload do arquivo Excel'])->withInput();
             }
 
             $filePath = $file->getRealPath();
             $spreadsheet = IOFactory::load($filePath);
             $worksheet = $spreadsheet->getActiveSheet();
 
-            // Mapeamento de templates
+            // Mapeamento de templates e tamanhos de bloco
             $templateMap = [
-                'termo_adesao' => 'termo_adesao.docx',
-                'criterios' => 'criterios.dot.docx',
+                'termo_adesao' => ['file' => 'termo_adesao.docx', 'chunkSize' => 4],
+                'criterios' => ['file' => 'criterios.docx', 'chunkSize' => 7],
             ];
 
-            // Processar cada template
-            foreach ($templateMap as $templateKey => $templateFile) {
-                $templatePath = storage_path('app/templates/' . $templateFile);
+            $downloadPaths = []; // Armazena os caminhos para download
+
+            foreach ($templateMap as $templateKey => $templateInfo) {
+                $templatePath = storage_path('app/templates/' . $templateInfo['file']);
 
                 if (!file_exists($templatePath)) {
-                    return back()
-                        ->withErrors(['template' => "Template $templateFile não encontrado"])
-                        ->withInput();
+                    return back()->withErrors(['template' => "Template {$templateInfo['file']} não encontrado"])->withInput();
                 }
 
                 $templateProcessor = new TemplateProcessor($templatePath);
 
+                // Função de limpeza de strings
                 $cleanString = function ($value) {
                     return $value === null || !is_string($value) ? '' : str_replace(' ', '', $value);
                 };
 
-                // Lê dados da planilha e insere no template Word
+                // Leitura dos dados do Excel e preenchimento do template
                 $data = [];
                 $header = [];
                 foreach ($worksheet->getRowIterator() as $row) {
@@ -69,40 +64,56 @@ class DocumentController extends Controller
                     } else {
                         $rowData = [];
                         foreach ($cellIterator as $cell) {
-                            $rowData[] = $cell->getValue();
+                            $cellValue = $cell->getValue();
+
+                            // Verifica se o valor é uma data serial
+                            if (\PhpOffice\PhpSpreadsheet\Shared\Date::isDateTime($cell) && is_numeric($cellValue)) {
+                                // Converte para o formato legível
+                                $cellValue = Date::excelToDateTimeObject($cellValue)->format('d/m/Y');
+                            }
+
+                            $rowData[] = $cellValue;
                         }
                         $data[] = array_combine($header, $rowData);
                     }
                 }
 
-                $dataChunks = array_chunk($data, 4);
+                // Define o tamanho do bloco com base no template
+                $chunkSize = $templateInfo['chunkSize'];
+                $dataChunks = array_chunk($data, $chunkSize);
                 $templateProcessor->cloneBlock('block_block', count($dataChunks), true, true);
 
                 foreach ($dataChunks as $blockIndex => $chunk) {
                     foreach ($chunk as $index => $item) {
                         $placeholderSuffix = ($index + 1);
-                        $templateProcessor->setValue('nome_do_titular' . $placeholderSuffix . '#' . ($blockIndex + 1), $item['TITULAR'] ?? '');
-                        $templateProcessor->setValue('cpf_do_titular' . $placeholderSuffix . '#' . ($blockIndex + 1), $item['CPF'] ?? '');
-                        $templateProcessor->setValue('nis_do_titular' . $placeholderSuffix . '#' . ($blockIndex + 1), $item['NIS'] ?? '');
-                        $templateProcessor->setValue('ci_do_titular' . $placeholderSuffix . '#' . ($blockIndex + 1), $item['RG'] ?? '');
-                        $templateProcessor->setValue('nome_do_conjugue' . $placeholderSuffix . '#' . ($blockIndex + 1), $item['CONJUGE'] ?? '');
-                        $templateProcessor->setValue('cpf_do_conjugue' . $placeholderSuffix . '#' . ($blockIndex + 1), $item['CPFCONJUGE'] ?? '');
-                        $templateProcessor->setValue('ci_do_conjugue' . $placeholderSuffix . '#' . ($blockIndex + 1), $item['RGCONJUGE'] ?? '');
-                        $templateProcessor->setValue('nis_do_conjugue' . $placeholderSuffix . '#' . ($blockIndex + 1), $item['NISCONJUGE'] ?? '');
+                        $blockIdentifier = '#' . ($blockIndex + 1);
+
+                        // Substituições para titulares e coobrigados
+                        $templateProcessor->setValue('nome_do_titular' . $placeholderSuffix . $blockIdentifier, $item['TITULAR'] ?? '');
+                        $templateProcessor->setValue('cpf_do_titular' . $placeholderSuffix . $blockIdentifier, $item['CPF'] ?? '');
+                        $templateProcessor->setValue('nis_tit' . $placeholderSuffix . $blockIdentifier, $item['NIS'] ?? '');
+                        $templateProcessor->setValue('rg_tit' . $placeholderSuffix . $blockIdentifier, $item['RG'] ?? '');
+                        $templateProcessor->setValue('nome_do_conjugue' . $placeholderSuffix . $blockIdentifier, $item['CONJUGE'] ?? '');
+                        $templateProcessor->setValue('cpf_do_conjugue' . $placeholderSuffix . $blockIdentifier, $item['CPFCONJUGE'] ?? '');
+                        $templateProcessor->setValue('rg_conj' . $placeholderSuffix . $blockIdentifier, $item['RGCONJUGE'] ?? '');
+                        $templateProcessor->setValue('nis_conj' . $placeholderSuffix . $blockIdentifier, $item['NISCONJUGE'] ?? '');
+                        $templateProcessor->setValue('nascimento' . $placeholderSuffix . $blockIdentifier, $item['NASCIMENTO'] ?? '');
                     }
                 }
 
-                // Salvar o documento preenchido para cada template
+                // Salvar o documento preenchido
                 $outputPath = storage_path("app/public/documento_preenchido_{$templateKey}.docx");
                 $templateProcessor->saveAs($outputPath);
+                $downloadPaths[] = asset("storage/documento_preenchido_{$templateKey}.docx");
             }
 
-            return response()->download(storage_path("app/public/documento_preenchido_{$templateKey}.docx"))->deleteFileAfterSend();
+
+            // Retorna os caminhos dos arquivos para o JavaScript
+            return response()->json(['files' => $downloadPaths]);
 
         } catch (\Exception $e) {
-            return back()
-                ->withErrors(['error' => 'Ocorreu um erro ao processar o arquivo: ' . $e->getMessage()])
-                ->withInput();
+            return back()->withErrors(['error' => 'Ocorreu um erro ao processar o arquivo: ' . $e->getMessage()])->withInput();
         }
     }
+
 }

@@ -9,7 +9,10 @@
         <div class="max-w-2xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6">
-                    <form action="{{ route('import.excel') }}" method="POST" enctype="multipart/form-data">
+                    <form id="excel-upload-form"
+                          action="{{ route('import.excel') }}"
+                          method="POST"
+                          enctype="multipart/form-data">
                         @csrf
 
                         <div class="mb-6">
@@ -19,7 +22,7 @@
                             </label>
 
                             <div
-                                    class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-md hover:border-gray-400 dark:hover:border-gray-500 transition-colors duration-200">
+                                class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-md hover:border-gray-400 dark:hover:border-gray-500 transition-colors duration-200">
                                 <div class="space-y-1 text-center">
                                     <svg class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" fill="none"
                                          stroke="currentColor" viewBox="0 0 24 24">
@@ -28,7 +31,7 @@
                                     </svg>
 
                                     <div
-                                            class="flex flex-col sm:flex-row items-center justify-center text-sm text-gray-600 dark:text-gray-400">
+                                        class="flex flex-col sm:flex-row items-center justify-center text-sm text-gray-600 dark:text-gray-400">
                                         <label for="excel_file"
                                                class="relative cursor-pointer rounded-md font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 dark:focus-within:ring-offset-gray-800">
                                             <span>Selecione um arquivo</span>
@@ -126,6 +129,36 @@
                 const fileName = this.files[0]?.name || 'Nenhum arquivo selecionado';
                 document.getElementById('file-selected').classList.remove('hidden');
                 document.getElementById('file-selected').querySelector('span').textContent = fileName;
+            });
+
+            document.addEventListener("DOMContentLoaded", function () {
+                const form = document.getElementById('excel-upload-form'); // Substitua pelo ID do seu formulário
+                form.addEventListener('submit', function (e) {
+                    e.preventDefault();
+
+                    const formData = new FormData(form);
+                    fetch(form.action, {
+                        method: 'POST',
+                        body: formData,
+                        headers: {
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        }
+                    })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.files && data.files.length > 0) {
+                                data.files.forEach(fileUrl => {
+                                    const link = document.createElement('a');
+                                    link.href = fileUrl;
+                                    link.download = fileUrl.split('/').pop();
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    document.body.removeChild(link);
+                                });
+                            }
+                        })
+                        .catch(error => console.error('Erro:', error));
+                });
             });
         </script>
 </x-app-layout>
