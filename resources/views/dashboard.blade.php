@@ -19,7 +19,7 @@
                             </label>
 
                             <div
-                                class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-md hover:border-gray-400 dark:hover:border-gray-500 transition-colors duration-200">
+                                    class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-md hover:border-gray-400 dark:hover:border-gray-500 transition-colors duration-200">
                                 <div class="space-y-1 text-center">
                                     <svg class="mx-auto h-12 w-12 text-gray-400 dark:text-gray-500" fill="none"
                                          stroke="currentColor" viewBox="0 0 24 24">
@@ -28,7 +28,7 @@
                                     </svg>
 
                                     <div
-                                        class="flex flex-col sm:flex-row items-center justify-center text-sm text-gray-600 dark:text-gray-400">
+                                            class="flex flex-col sm:flex-row items-center justify-center text-sm text-gray-600 dark:text-gray-400">
                                         <label for="excel_file"
                                                class="relative cursor-pointer rounded-md font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 dark:focus-within:ring-offset-gray-800">
                                             <span>Selecione um arquivo</span>
@@ -53,7 +53,7 @@
 
                         <div class="flex flex-col items-center gap-4">
                             <x-primary-button type="submit">
-                                {{ __('Importar Planilha') }}
+                                {{ __('Gerar Documentos') }}
                             </x-primary-button>
 
                         </div>
