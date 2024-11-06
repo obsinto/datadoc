@@ -15,6 +15,11 @@ if ! grep -q 'APP_KEY' .env; then
     php artisan key:generate --force
 fi
 
+# Criar o link simbólico se não existir
+if [ ! -L /var/www/public/storage ]; then
+    php artisan storage:link
+fi
+
 # Rodar as migrations com --force
 php artisan migrate --force
 
