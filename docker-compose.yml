@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile.nginx
+    image: nginx-datadoc:${NGINX_IMAGE_VERSION}
+    container_name: nginx-datadoc
+    volumes:
+      - ${NGINX_PUBLIC_VOLUME}:/var/www/public
+      - ${NGINX_STORAGE_VOLUME}:/var/www/storage
+    depends_on:
+      - php
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.nginx-datadoc.entrypoints=websecure
+      - traefik.http.routers.nginx-datadoc.rule=Host(`datadoc.m43.agilytech.com`)
+      - traefik.http.routers.nginx-datadoc.tls.certresolver=letsencryptresolver
+      - traefik.http.services.nginx-datadoc.loadbalancer.server.port=80
+    restart: unless-stopped
+    networks:
+      - m43_network 
+
+  php:
+    build:
+      context: .
+      dockerfile: Dockerfile.php
+    image: php-datadoc:${PHP_IMAGE_VERSION}
+    container_name: php-datadoc
+    volumes:
+      - ${PHP_APP_VOLUME}:/var/www
+      - ${PHP_LOGS_VOLUME}:/var/www/storage/logs
+    environment:
+      - PHP_VERSION=${PHP_VERSION}
+    depends_on:
+      - mysql
+    restart: unless-stopped
+    networks:
+      - m43_network
+
+  mysql:
+    image: mysql:${MYSQL_VERSION}
+    container_name: mysql-datadoc
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "${MYSQL_PORT}:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - m43_network
+
+
+
+volumes:
+  mysql_data:
+
+networks:
+  m43_network:
+    external: true
