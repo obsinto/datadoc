@@ -82,7 +82,6 @@ class DocumentController extends Controller
                 $chunkSize = $templateInfo['chunkSize'];
                 $dataChunks = array_chunk($data, $chunkSize);
                 $templateProcessor->cloneBlock('block_block', count($dataChunks), true, true);
-
                 foreach ($dataChunks as $blockIndex => $chunk) {
                     foreach ($chunk as $index => $item) {
                         $placeholderSuffix = ($index + 1);
@@ -98,6 +97,7 @@ class DocumentController extends Controller
                         $templateProcessor->setValue('rg_conj' . $placeholderSuffix . $blockIdentifier, $item['RGCONJUGE'] ?? '');
                         $templateProcessor->setValue('nis_conj' . $placeholderSuffix . $blockIdentifier, $item['NISCONJUGE'] ?? '');
                         $templateProcessor->setValue('nascimento' . $placeholderSuffix . $blockIdentifier, $item['NASCIMENTO'] ?? '');
+                        $templateProcessor->setValue('endereco' . $placeholderSuffix . $blockIdentifier, $item['ENDERECO'] ?? '');
                     }
                 }
 
