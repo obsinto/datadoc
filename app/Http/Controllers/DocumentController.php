@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use Exception;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Storage;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date;
 use PhpOffice\PhpWord\TemplateProcessor;
@@ -32,27 +33,14 @@ class DocumentController extends Controller
                 'tipo' => $file->getMimeType()
             ]);
 
-            $inputFileType = IOFactory::identify($file->getRealPath());
-            $reader = IOFactory::createReader($inputFileType);
-            $reader->setReadDataOnly(true);
+            $spreadsheet = $this->loadSpreadsheet($file);
+            $data = $this->readExcelData($spreadsheet->getActiveSheet());
 
-            if ($inputFileType === 'Xls') {
-                Log::info('Arquivo XLS detectado, usando configurações específicas');
-                $reader->setReadEmptyCells(false);
-            }
-
-            $spreadsheet = $reader->load($file->getRealPath());
-            $worksheet = $spreadsheet->getActiveSheet();
-            Log::info('Excel carregado com sucesso');
-
-            $data = $this->readExcelData($worksheet);
             if (empty($data)) {
                 throw new Exception('Nenhum dado válido encontrado na planilha.');
             }
 
-            Log::info('Dados lidos com sucesso', [
-                'total_registros' => count($data)
-            ]);
+            Log::info('Dados lidos com sucesso', ['total_registros' => count($data)]);
 
             $downloadPaths = [];
             foreach ($this->templateMap as $templateKey => $templateInfo) {
@@ -61,7 +49,7 @@ class DocumentController extends Controller
 
             return response()->json([
                 'success' => true,
-                'files' => $downloadPaths
+                'files' => $downloadPaths,
             ]);
 
         } catch (Exception $e) {
@@ -76,12 +64,25 @@ class DocumentController extends Controller
         }
     }
 
+    private function loadSpreadsheet($file)
+    {
+        $inputFileType = IOFactory::identify($file->getRealPath());
+        $reader = IOFactory::createReader($inputFileType);
+        $reader->setReadDataOnly(true);
+
+        if ($inputFileType === 'Xls') {
+            Log::info('Arquivo XLS detectado, usando configurações específicas');
+            $reader->setReadEmptyCells(false);
+        }
+
+        return $reader->load($file->getRealPath());
+    }
+
     private function readExcelData($worksheet)
     {
         $data = [];
         $headers = [];
 
-        // Lê os headers
         foreach ($worksheet->getRowIterator(1, 1) as $row) {
             foreach ($row->getCellIterator() as $cell) {
                 $value = trim($cell->getValue());
@@ -97,7 +98,6 @@ class DocumentController extends Controller
             throw new Exception('Nenhum cabeçalho encontrado na planilha');
         }
 
-        // Lê os dados
         foreach ($worksheet->getRowIterator(2) as $row) {
             $rowData = [];
             $hasData = false;
@@ -105,24 +105,10 @@ class DocumentController extends Controller
 
             foreach ($row->getCellIterator() as $cell) {
                 if (isset($headers[$colIndex])) {
-                    $value = $cell->getValue();
-
-                    if ($cell->isFormula()) {
-                        $value = $cell->getCalculatedValue();
-                    }
-
-                    if (Date::isDateTime($cell)) {
-                        try {
-                            $value = Date::excelToDateTimeObject($value)->format('d/m/Y');
-                        } catch (Exception $e) {
-                            $value = '';
-                        }
-                    }
-
+                    $value = $this->formatCellValue($cell);
                     if ($value !== null && $value !== '') {
                         $hasData = true;
                     }
-
                     $rowData[$headers[$colIndex]] = $value;
                 }
                 $colIndex++;
@@ -136,22 +122,41 @@ class DocumentController extends Controller
         return $data;
     }
 
+    private function formatCellValue($cell)
+    {
+        $value = $cell->getValue();
+        if ($cell->isFormula()) {
+            $value = $cell->getCalculatedValue();
+        }
+
+        if (Date::isDateTime($cell)) {
+            try {
+                return Date::excelToDateTimeObject($value)->format('d/m/Y');
+            } catch (Exception $e) {
+                return '';
+            }
+        }
+
+        return $value;
+    }
+
     private function processTemplate($templateKey, $templateInfo, $data)
     {
         try {
             Log::info("Iniciando processamento do template: {$templateKey}");
 
+            // Verifica primeiro usando o path completo do sistema
             $templatePath = storage_path("app/templates/{$templateInfo['file']}");
+
             if (!file_exists($templatePath)) {
+                Log::error("Template não encontrado em: {$templatePath}");
                 throw new Exception("Template não encontrado: {$templateInfo['file']}");
             }
 
             $templateProcessor = new TemplateProcessor($templatePath);
-            Log::info("Template carregado com sucesso");
+            Log::info("Template carregado com sucesso", ['path' => $templatePath]);
 
             $chunks = array_chunk($data, $templateInfo['chunkSize']);
-            Log::info("Dados divididos em chunks", ['quantidade' => count($chunks)]);
-
             $templateProcessor->cloneBlock('block_block', count($chunks), true, true);
 
             foreach ($chunks as $blockIndex => $chunk) {
@@ -160,13 +165,19 @@ class DocumentController extends Controller
                 }
             }
 
+            // Cria o diretório public se não existir
+            $publicPath = storage_path('app/public');
+            if (!file_exists($publicPath)) {
+                mkdir($publicPath, 0755, true);
+            }
+
             $outputFileName = "documento_preenchido_{$templateKey}.docx";
             $outputPath = storage_path("app/public/{$outputFileName}");
             $templateProcessor->saveAs($outputPath);
 
             Log::info("Documento salvo com sucesso", ['caminho' => $outputPath]);
 
-            return asset("storage/{$outputFileName}");
+            return Storage::url($outputFileName);
 
         } catch (Exception $e) {
             Log::error("Erro processando template {$templateKey}: " . $e->getMessage());
@@ -176,40 +187,23 @@ class DocumentController extends Controller
 
     private function fillTemplateValues($templateProcessor, $item, $index, $blockIndex)
     {
-        try {
-            $blockId = '#' . $blockIndex;
+        $blockId = '#' . $blockIndex;
+        $replacements = [
+            'nome_do_titular' => $this->processField($item['TITULAR'], 'text'),
+            'cpf_do_titular' => $this->processField($item['CPF'], 'cpf'),
+            'nis_tit' => $this->formatNIS($item['NIS']),
+            'rg_tit' => $this->formatRG($item['RG']),
+            'nome_do_conjugue' => $this->processField($item['CONJUGE'], 'text'),
+            'cpf_do_conjugue' => $this->processField($item['CPF CONJUGE'], 'cpf'),
+            'rg_conj' => $this->formatRG($item['RG CONJUGE']),
+            'nis_conj' => $this->formatNIS($item['NIS CONJUGE']),
+            'nascimento' => $this->formatDate($item['NASCIMENTO']),
+            'endereco' => $this->formatTextValue($item['ENDEREÇO']),
+            'nascimento_conj' => $this->formatDate($item['NASCIMENTO CONJ']),
+        ];
 
-            // Processa e valida os dados antes de formatar
-            $titular = $this->processField($item['TITULAR'], 'text');
-            $cpfTitular = $this->processField($item['CPF'], 'cpf');
-            $conjuge = $this->processField($item['CONJUGE'], 'text');
-            $cpfConjuge = $this->processField($item['CPF CONJUGE'], 'cpf');
-
-            $replacements = [
-                'nome_do_titular' => $titular,
-                'cpf_do_titular' => $cpfTitular,
-                'nis_tit' => $this->formatNIS($item['NIS']),
-                'rg_tit' => $this->formatRG($item['RG']),
-                'nome_do_conjugue' => $conjuge,
-                'cpf_do_conjugue' => $cpfConjuge,
-                'rg_conj' => $this->formatRG($item['RG CONJUGE']),
-                'nis_conj' => $this->formatNIS($item['NIS CONJUGE']),
-                'nascimento' => $this->formatDate($item['NASCIMENTO']),
-                'endereco' => $this->formatTextValue($item['ENDEREÇO'])
-            ];
-
-            foreach ($replacements as $field => $value) {
-                $placeholder = $field . $index . $blockId;
-                $templateProcessor->setValue($placeholder, $value);
-            }
-
-        } catch (Exception $e) {
-            Log::error("Erro ao preencher valores do template", [
-                'bloco' => $blockIndex,
-                'index' => $index,
-                'erro' => $e->getMessage()
-            ]);
-            throw $e;
+        foreach ($replacements as $field => $value) {
+            $templateProcessor->setValue("{$field}{$index}{$blockId}", $value);
         }
     }
 
@@ -260,7 +254,7 @@ class DocumentController extends Controller
         $cpf = preg_replace('/[^0-9]/', '', (string)$value);
 
         if (strlen($cpf) !== 11) {
-            return '';
+            return 'Cpf Inválido!';
         }
 
         return substr($cpf, 0, 3) . '.' .
@@ -311,4 +305,5 @@ class DocumentController extends Controller
 
         return '';
     }
+    // Funções de formatação (formatCPF, formatRG, formatNIS, formatTextValue) permanecem como no original
 }
