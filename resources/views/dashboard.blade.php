@@ -26,7 +26,36 @@
                     </div>
                 </div>
             </div>
+{{--            //--}}
+            {{--            <form action="{{ route('diagnose.excel') }}" method="POST" enctype="multipart/form-data" class="space-y-4">--}}
+            {{--                @csrf--}}
+            {{--                <div class="flex flex-col space-y-2">--}}
+            {{--                    <label for="excel_file" class="font-medium text-gray-700">Selecione o arquivo Excel</label>--}}
+            {{--                    <input--}}
+            {{--                        type="file"--}}
+            {{--                        name="excel_file"--}}
+            {{--                        id="excel_file"--}}
+            {{--                        accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"--}}
+            {{--                        class="px-4 py-2 border rounded-md"--}}
+            {{--                        required--}}
+            {{--                    >--}}
+            {{--                </div>--}}
 
+            {{--                @error('excel_file')--}}
+            {{--                <div class="text-red-500 text-sm mt-1">{{ $message }}</div>--}}
+            {{--                @enderror--}}
+
+            {{--                <button type="submit" class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600">--}}
+            {{--                    Diagnosticar Planilha--}}
+            {{--                </button>--}}
+            {{--            </form>--}}
+
+            {{--            @if(session('error'))--}}
+            {{--                <div class="mt-4 p-4 bg-red-100 text-red-700 rounded-md">--}}
+            {{--                    {{ session('error') }}--}}
+            {{--                </div>--}}
+            {{--            @endif--}}
+            {{--            //--}}
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6">
                     <form id="excel-upload-form"
