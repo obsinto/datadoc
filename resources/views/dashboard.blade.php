@@ -7,6 +7,26 @@
 
     <div class="py-12">
         <div class="max-w-2xl mx-auto sm:px-6 lg:px-8">
+            <!-- Área de Alertas/Erros -->
+            <div id="error-area" class="mb-4 hidden text-red-600">
+                <div class="rounded-md bg-red-50 dark:bg-red-900/50 p-4">
+                    <div class="flex">
+                        <div class="flex-shrink-0">
+                            <svg class="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd"
+                                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.28 7.22a.75.75 0 00-1.06 1.06L8.94 10l-1.72 1.72a.75.75 0 101.06 1.06L10 11.06l1.72 1.72a.75.75 0 101.06-1.06L11.06 10l1.72-1.72a.75.75 0 00-1.06-1.06L10 8.94 8.28 7.22z"
+                                      clip-rule="evenodd"/>
+                            </svg>
+                        </div>
+                        <div class="ml-3">
+                            <h3 class="text-sm font-medium text-red-800 dark:text-red-200" id="error-title"></h3>
+                            <div class="mt-2 text-sm text-red-700 dark:text-red-200" id="error-message"></div>
+                            <div class="mt-2 text-sm text-red-700 dark:text-red-200" id="missing-columns"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6">
                     <form id="excel-upload-form"
@@ -17,7 +37,7 @@
 
                         <div class="mb-6">
                             <label for="excel_file"
-                                   class=" text-center block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                   class="text-center block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 Selecione o arquivo Excel
                             </label>
 
@@ -30,8 +50,7 @@
                                               d="M9 13h6m-3-3v6m5 5H7a2 2 0 01-2-2V7a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
                                     </svg>
 
-                                    <div
-                                        class="flex flex-col sm:flex-row items-center justify-center text-sm text-gray-600 dark:text-gray-400">
+                                    <div class="flex flex-col sm:flex-row items-center justify-center text-sm text-gray-600 dark:text-gray-400">
                                         <label for="excel_file"
                                                class="relative cursor-pointer rounded-md font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500 dark:focus-within:ring-offset-gray-800">
                                             <span>Selecione um arquivo</span>
@@ -58,94 +77,125 @@
                             <x-primary-button type="submit">
                                 {{ __('Gerar Documentos') }}
                             </x-primary-button>
-
                         </div>
                     </form>
-                    @if($errors->any())
-                        <x-alert/>
-                    @endif
-
                 </div>
             </div>
         </div>
+    </div>
 
-        <script>
-            const fileInput = document.getElementById('excel_file');
-            const fileSelected = document.getElementById('file-selected');
-            const fileNameSpan = fileSelected.querySelector('span');
+    <script>
+        const fileInput = document.getElementById('excel_file');
+        const fileSelected = document.getElementById('file-selected');
+        const fileNameSpan = fileSelected.querySelector('span');
+        const errorArea = document.getElementById('error-area');
+        const errorTitle = document.getElementById('error-title');
+        const errorMessage = document.getElementById('error-message');
+        const missingColumns = document.getElementById('missing-columns');
 
-            fileInput.addEventListener('change', function (e) {
-                const fileName = e.target.files[0]?.name;
-                if (fileName) {
-                    fileNameSpan.textContent = fileName;
-                    fileSelected.classList.remove('hidden');
-                } else {
-                    fileSelected.classList.add('hidden');
-                }
-            });
+        // Função para mostrar erro
+        function showError(title, message, columns = null) {
+            errorTitle.textContent = title;
+            errorMessage.textContent = message;
 
-            // Adiciona suporte para drag and drop
-            const dropZone = document.querySelector('.border-dashed');
-
-            ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, preventDefaults, false);
-            });
-
-            function preventDefaults(e) {
-                e.preventDefault();
-                e.stopPropagation();
+            if (columns && columns.length > 0) {
+                missingColumns.textContent = 'Colunas faltantes: ' + columns.join(', ');
+                missingColumns.classList.remove('hidden');
+            } else {
+                missingColumns.classList.add('hidden');
             }
 
-            ['dragenter', 'dragover'].forEach(eventName => {
-                dropZone.addEventListener(eventName, highlight, false);
-            });
+            errorArea.classList.remove('hidden');
+        }
 
-            ['dragleave', 'drop'].forEach(eventName => {
-                dropZone.addEventListener(eventName, unhighlight, false);
-            });
+        // Função para esconder erro
+        function hideError() {
+            errorArea.classList.add('hidden');
+        }
 
-            function highlight(e) {
+        // Configuração do input de arquivo
+        fileInput.addEventListener('change', function (e) {
+            const fileName = e.target.files[0]?.name;
+            if (fileName) {
+                fileNameSpan.textContent = fileName;
+                fileSelected.classList.remove('hidden');
+                hideError(); // Esconde erros anteriores
+            } else {
+                fileSelected.classList.add('hidden');
+            }
+        });
+
+        // Configuração do drag and drop
+        const dropZone = document.querySelector('.border-dashed');
+
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        ['dragenter', 'dragover'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
                 dropZone.classList.add('border-indigo-500', 'dark:border-indigo-400');
-            }
-
-            function unhighlight(e) {
-                dropZone.classList.remove('border-indigo-500', 'dark:border-indigo-400');
-            }
-
-            dropZone.addEventListener('drop', handleDrop, false);
-
-            function handleDrop(e) {
-                const dt = e.dataTransfer;
-                const file = dt.files[0];
-
-                if (file) {
-                    fileInput.files = dt.files;
-                    fileNameSpan.textContent = file.name;
-                    fileSelected.classList.remove('hidden');
-                }
-            }
-
-            document.getElementById('excel_file').addEventListener('change', function () {
-                const fileName = this.files[0]?.name || 'Nenhum arquivo selecionado';
-                document.getElementById('file-selected').classList.remove('hidden');
-                document.getElementById('file-selected').querySelector('span').textContent = fileName;
             });
+        });
 
-            document.addEventListener("DOMContentLoaded", function () {
-                const form = document.getElementById('excel-upload-form'); // Substitua pelo ID do seu formulário
-                form.addEventListener('submit', function (e) {
-                    e.preventDefault();
+        ['dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, () => {
+                dropZone.classList.remove('border-indigo-500', 'dark:border-indigo-400');
+            });
+        });
 
-                    const formData = new FormData(form);
-                    fetch(form.action, {
-                        method: 'POST',
-                        body: formData,
-                        headers: {
-                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                        }
-                    })
-                        .then(response => response.json())
-                        .then(data => {
+        dropZone.addEventListener('drop', function (e) {
+            const dt = e.dataTransfer;
+            const file = dt.files[0];
+
+            if (file) {
+                fileInput.files = dt.files;
+                fileNameSpan.textContent = file.name;
+                fileSelected.classList.remove('hidden');
+                hideError(); // Esconde erros anteriores
+            }
+        });
+
+        // Configuração do envio do formulário
+        document.addEventListener("DOMContentLoaded", function () {
+            const form = document.getElementById('excel-upload-form');
+
+            form.addEventListener('submit', function (e) {
+                e.preventDefault();
+                hideError(); // Limpa erros anteriores
+
+                const formData = new FormData(form);
+                const submitButton = form.querySelector('button[type="submit"]');
+
+                // Desabilitar botão e mostrar loading
+                submitButton.disabled = true;
+                submitButton.innerHTML = `
+                    <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Processando...
+                `;
+
+                fetch(form.action, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        // Reabilitar botão
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = 'Gerar Documentos';
+
+                        if (data.success) {
                             if (data.files && data.files.length > 0) {
                                 data.files.forEach(fileUrl => {
                                     const link = document.createElement('a');
@@ -156,9 +206,18 @@
                                     document.body.removeChild(link);
                                 });
                             }
-                        })
-                        .catch(error => console.error('Erro:', error));
-                });
+                        } else {
+                            showError('Erro!', data.message, data.missing_columns);
+                        }
+                    })
+                    .catch(error => {
+                        // Reabilitar botão
+                        submitButton.disabled = false;
+                        submitButton.innerHTML = 'Gerar Documentos';
+
+                        showError('Erro!', 'Ocorreu um erro ao processar o arquivo. Por favor, tente novamente.');
+                    });
             });
-        </script>
+        });
+    </script>
 </x-app-layout>
