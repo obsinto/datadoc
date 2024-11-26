@@ -35,9 +35,9 @@ class DocumentController extends Controller
                 ], 400);
             }
 
-            $reader = IOFactory::createReader('Xlsx');
-            $reader->setReadDataOnly(true); // Otimiza a leitura
-            $spreadsheet = $reader->load($file->getRealPath());
+            // Mudança principal: usar IOFactory::load() diretamente como na versão funcional
+            $filePath = $file->getRealPath();
+            $spreadsheet = IOFactory::load($filePath);
             $worksheet = $spreadsheet->getActiveSheet();
 
             // Validar cabeçalhos antes de processar
@@ -55,7 +55,7 @@ class DocumentController extends Controller
 
             foreach ($templateMap as $templateKey => $templateInfo) {
                 $templateProcessor = $this->loadTemplate($templateInfo['file']);
-                $data = $this->readExcelDataUsingReader($worksheet);
+                $data = $this->readExcelData($worksheet);
                 $this->populateTemplate($templateProcessor, $data, $templateInfo['chunkSize']);
 
                 $outputPath = $this->saveDocument($templateProcessor, $templateKey);
@@ -123,7 +123,7 @@ class DocumentController extends Controller
         return new TemplateProcessor($templatePath);
     }
 
-    private function readExcelDataUsingReader($worksheet)
+    private function readExcelData($worksheet)
     {
         $data = [];
         $header = [];
@@ -145,11 +145,8 @@ class DocumentController extends Controller
             }
 
             if ($rowIndex === 1) {
-                $header = array_map(fn($value) => $this->cleanString($value), $rowData);
+                $header = array_map([$this, 'cleanString'], $rowData);
             } else {
-                if (count($header) !== count($rowData)) {
-                    throw new \Exception("Inconsistência de dados na linha {$rowIndex}");
-                }
                 $data[] = array_combine($header, $rowData);
             }
         }
@@ -196,14 +193,8 @@ class DocumentController extends Controller
 
     private function saveDocument($templateProcessor, $templateKey)
     {
-        $outputFileName = "{$templateKey}_" . now()->timestamp . ".docx";
-        $outputPath = "public/{$outputFileName}";
-        $templateProcessor->saveAs(storage_path("app/{$outputPath}"));
-
-        if (!file_exists(storage_path("app/{$outputPath}"))) {
-            throw new \Exception("Erro ao salvar o arquivo {$outputFileName}");
-        }
-
+        $outputFileName = "documento_preenchido_{$templateKey}.docx";
+        $templateProcessor->saveAs(storage_path("app/public/{$outputFileName}"));
         return $outputFileName;
     }
 }
