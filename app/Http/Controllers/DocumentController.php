@@ -221,7 +221,7 @@ class DocumentController extends Controller
                 return $this->formatTextValue($value);
 
             case 'cpf':
-                if (!is_numeric($value) && strlen($value) > 14) {
+                if (!is_numeric($value) && strlen($value) > 15) {
                     return ''; // Ignora textos longos em campos de CPF
                 }
                 return $this->formatCPF($value);
@@ -253,9 +253,14 @@ class DocumentController extends Controller
         // Remove tudo que não é número
         $cpf = preg_replace('/[^0-9]/', '', (string)$value);
 
+        if (strlen($cpf) === 10) {
+            $cpf = str_pad($cpf, 11, 0, STR_PAD_LEFT);
+        }
+
         if (strlen($cpf) !== 11) {
             return 'Cpf Inválido!';
         }
+
 
         return substr($cpf, 0, 3) . '.' .
             substr($cpf, 3, 3) . '.' .
